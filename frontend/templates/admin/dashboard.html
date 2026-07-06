@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="container py-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="page-title mb-0"><i class="bi bi-shield-lock me-2 text-warning"></i>Admin Panel</h1>
+      <span class="badge bg-warning text-dark">Administrator</span>
+    </div>
+
+    <!-- Stats -->
+    <div class="row g-3 mb-4">
+      {% for icon, label, value, color in [
+        ("bi-people", "Total Users", user_count, "#6929C4"),
+        ("bi-airplane", "Total Trips", trip_count, "#0062FF"),
+        ("bi-geo-alt", "Top Destination", top_destinations[0].destination if top_destinations else "—", "#009D9A"),
+        ("bi-bar-chart", "Avg Trips/User", (trip_count // user_count if user_count else 0), "#198038"),
+      ] %}
+      <div class="col-6 col-lg-3">
+        <div class="stat-card"><div class="stat-card-icon" style="color:{{ color }}"><i class="bi {{ icon }}"></i></div><div class="stat-card-value">{{ value }}</div><div class="stat-card-label">{{ label }}</div></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="row g-4">
+
+      <!-- Users Table -->
+      <div class="col-lg-6">
+        <div class="card-panel">
+          <div class="panel-header d-flex justify-content-between align-items-center mb-3">
+            <h5 class="panel-title mb-0"><i class="bi bi-people me-2 text-primary"></i>Users</h5>
+            <a href="{{ url_for('admin.manage_users') }}" class="btn btn-sm btn-outline-primary">View All</a>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Joined</th></tr></thead>
+              <tbody>
+                {% for u in users[:8] %}
+                <tr>
+                  <td><span class="user-avatar-sm">{{ u.name[0]|upper }}</span> {{ u.name }}</td>
+                  <td class="text-muted small">{{ u.email }}</td>
+                  <td><span class="badge bg-{{ 'warning' if u.role == 'admin' else 'secondary' }}">{{ u.role }}</span></td>
+                  <td class="text-muted small">{{ u.created_at[:10] }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Top Destinations -->
+      <div class="col-lg-6">
+        <div class="card-panel">
+          <h5 class="panel-title mb-3"><i class="bi bi-geo-alt me-2 text-success"></i>Top Destinations</h5>
+          <canvas id="destChart" height="220"></canvas>
+        </div>
+      </div>
+
+      <!-- Recent Trips -->
+      <div class="col-12">
+        <div class="card-panel">
+          <div class="panel-header d-flex justify-content-between align-items-center mb-3">
+            <h5 class="panel-title mb-0"><i class="bi bi-airplane me-2 text-primary"></i>Recent Trips</h5>
+            <a href="{{ url_for('admin.manage_trips') }}" class="btn btn-sm btn-outline-primary">View All</a>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm table-hover">
+              <thead><tr><th>Destination</th><th>User</th><th>Style</th><th>Budget</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody>
+                {% for t in trips %}
+                <tr>
+                  <td><strong>{{ t.destination }}</strong></td>
+                  <td class="text-muted small">{{ t.user_name }}</td>
+                  <td><span class="badge bg-light text-dark">{{ t.travel_style|title }}</span></td>
+                  <td>${{ "%.0f"|format(t.budget) }}</td>
+                  <td><span class="badge bg-{{ 'success' if t.status == 'completed' else 'secondary' }}">{{ t.status }}</span></td>
+                  <td class="text-muted small">{{ t.created_at[:10] }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TOP_DESTINATIONS = {{ top_destinations|map(attribute='destination')|list|tojson }};
+const DEST_COUNTS      = {{ top_destinations|map(attribute='count')|list|tojson }};
+
+document.addEventListener("DOMContentLoaded", () => {
+  if (TOP_DESTINATIONS.length) {
+    new Chart(document.getElementById("destChart"), {
+      type: "bar",
+      data: {
+        labels: TOP_DESTINATIONS,
+        datasets: [{
+          label: "Trips",
+          data: DEST_COUNTS,
+          backgroundColor: "#0062FF",
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  }
+});
+</script>
+{% endblock %}

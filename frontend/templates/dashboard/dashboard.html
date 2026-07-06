@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — AI Travel Planner{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="container py-4">
+
+    <!-- ── Header ───────────────────────────────────────────── -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+      <div>
+        <h1 class="page-title mb-1">Good Day, {{ user_name }} 👋</h1>
+        <p class="text-muted mb-0">Here's an overview of your travel plans</p>
+      </div>
+      <a href="{{ url_for('planner.new_trip') }}" class="btn btn-ibm">
+        <i class="bi bi-plus-lg me-2"></i>Plan New Trip
+      </a>
+    </div>
+
+    <!-- ── Stat Cards ─────────────────────────────────────────── -->
+    <div class="row g-3 mb-4">
+      {% for icon, label, value, color in [
+        ("bi-airplane", "Total Trips",   stats.total_trips,  "#0062FF"),
+        ("bi-bookmark", "Saved Trips",   stats.saved_trips,  "#6929C4"),
+        ("bi-check2-circle","Completed", stats.completed,    "#198038"),
+        ("bi-wallet2",  "Total Budget",  "$ {:,.0f}".format(stats.total_budget), "#B28600"),
+      ] %}
+      <div class="col-6 col-lg-3">
+        <div class="stat-card h-100">
+          <div class="stat-card-icon" style="color: {{ color }}"><i class="bi {{ icon }}"></i></div>
+          <div class="stat-card-value">{{ value }}</div>
+          <div class="stat-card-label">{{ label }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="row g-4">
+
+      <!-- ── Recent Trips ──────────────────────────────────────── -->
+      <div class="col-lg-7">
+        <div class="card-panel h-100">
+          <div class="panel-header d-flex justify-content-between align-items-center">
+            <h5 class="panel-title mb-0"><i class="bi bi-clock-history me-2 text-primary"></i>Recent Trips</h5>
+            <a href="{{ url_for('planner.new_trip') }}" class="btn btn-sm btn-outline-primary">+ New</a>
+          </div>
+          {% if trips %}
+            <div class="trip-list mt-3">
+              {% for trip in trips %}
+              <div class="trip-item">
+                <div class="trip-icon">
+                  {% if trip.travel_style == 'luxury' %}💎
+                  {% elif trip.travel_style == 'adventure' %}🏔
+                  {% elif trip.travel_style == 'family' %}👨‍👩‍👧‍👦
+                  {% else %}✈{% endif %}
+                </div>
+                <div class="trip-info flex-grow-1">
+                  <div class="trip-dest fw-semibold">{{ trip.destination }}</div>
+                  <div class="trip-meta text-muted small">
+                    <i class="bi bi-calendar3 me-1"></i>{{ trip.start_date }} → {{ trip.end_date }}
+                    <span class="ms-2"><i class="bi bi-wallet2 me-1"></i>${{ "%.0f" | format(trip.budget) }}</span>
+                  </div>
+                </div>
+                <div class="trip-actions d-flex gap-2 align-items-center">
+                  <span class="status-badge status-{{ trip.status }}">{{ trip.status|title }}</span>
+                  <a href="{{ url_for('planner.view_trip', trip_id=trip.id) }}" class="btn btn-xs btn-primary">View</a>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="empty-state mt-4">
+              <div class="empty-icon">🗺️</div>
+              <p class="text-muted">No trips yet. Plan your first adventure!</p>
+              <a href="{{ url_for('planner.new_trip') }}" class="btn btn-ibm btn-sm">Plan a Trip</a>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- ── Weather + Saved ───────────────────────────────────── -->
+      <div class="col-lg-5">
+        {% if weather and not weather.error %}
+        <div class="card-panel weather-widget mb-4">
+          <h5 class="panel-title mb-3"><i class="bi bi-cloud-sun me-2 text-warning"></i>Weather — {{ weather.city }}</h5>
+          <div class="weather-main d-flex align-items-center gap-3">
+            <img src="https://openweathermap.org/img/wn/{{ weather.icon }}@2x.png" alt="weather" width="64" />
+            <div>
+              <div class="weather-temp">{{ weather.temperature }}°C</div>
+              <div class="weather-desc text-muted">{{ weather.description }}</div>
+            </div>
+          </div>
+          <div class="weather-details row g-2 mt-3">
+            <div class="col-6"><span class="wkey">💧 Humidity</span><span class="wval">{{ weather.humidity }}%</span></div>
+            <div class="col-6"><span class="wkey">💨 Wind</span><span class="wval">{{ weather.wind_speed }} m/s</span></div>
+            <div class="col-6"><span class="wkey">🌡 Feels Like</span><span class="wval">{{ weather.feels_like }}°C</span></div>
+            <div class="col-6"><span class="wkey">👁 Visibility</span><span class="wval">{{ weather.visibility }} km</span></div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Saved Trips Quick List -->
+        <div class="card-panel">
+          <h5 class="panel-title mb-3"><i class="bi bi-bookmark-star me-2 text-warning"></i>Saved Trips</h5>
+          {% if saved %}
+            {% for s in saved[:4] %}
+            <div class="saved-item d-flex justify-content-between align-items-center py-2 border-bottom">
+              <div>
+                <div class="fw-semibold small">{{ s.destination }}</div>
+                <div class="text-muted" style="font-size:.75rem">{{ s.start_date }}</div>
+              </div>
+              <a href="{{ url_for('planner.view_trip', trip_id=s.trip_id) }}" class="btn btn-xs btn-outline-primary">View</a>
+            </div>
+            {% endfor %}
+            <a href="{{ url_for('planner.saved_trips') }}" class="btn btn-sm btn-link p-0 mt-2">View all saved →</a>
+          {% else %}
+            <p class="text-muted small">No saved trips yet.</p>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Travel Tips ─────────────────────────────────────────── -->
+    <div class="card-panel mt-4">
+      <h5 class="panel-title mb-3"><i class="bi bi-lightbulb me-2 text-warning"></i>Quick Travel Tips</h5>
+      <div class="row g-3">
+        {% for tip in [
+          ("💳", "Book flights 6–8 weeks in advance for best rates."),
+          ("🌍", "Always carry a physical copy of important documents."),
+          ("🏥", "Purchase travel insurance before every international trip."),
+          ("📱", "Download offline maps — data can be unreliable abroad."),
+          ("💰", "Keep 10–15% of budget as emergency reserve."),
+          ("🌤", "Check weather 72 hours before departure."),
+        ] %}
+        <div class="col-md-6 col-lg-4">
+          <div class="tip-chip">{{ tip[0] }} {{ tip[1] }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Personalise greeting based on local time
+(function() {
+  const h = new Date().getHours();
+  const greet = h < 12 ? 'Morning' : h < 18 ? 'Afternoon' : 'Evening';
+  const el = document.querySelector('.page-title');
+  if (el) el.textContent = el.textContent.replace('Good Day', 'Good ' + greet);
+})();
+</script>
+{% endblock %}

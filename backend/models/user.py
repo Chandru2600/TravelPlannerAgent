@@ -1,0 +1,85 @@
+"""
+TravelPlannerAgent - User Model
+IBM SkillsBuild Internship Project
+"""
+
+import hashlib
+import os
+from backend.database.db import execute_query, execute_insert
+
+
+def hash_password(password: str) -> str:
+    """SHA-256 hash with random salt."""
+    salt = os.urandom(16).hex()
+    hashed = hashlib.sha256((password + salt).encode()).hexdigest()
+    return f"{salt}:{hashed}"
+
+
+def verify_password(password: str, stored: str) -> bool:
+    """Verify password against stored salt:hash."""
+    try:
+        salt, hashed = stored.split(":")
+        return hashlib.sha256((password + salt).encode()).hexdigest() == hashed
+    except Exception:
+        return False
+
+
+def create_user(name: str, email: str, password: str, role: str = "user") -> int:
+    """Insert a new user and return the new user ID."""
+    hashed_pw = hash_password(password)
+    return execute_insert(
+        "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
+        (name, email, hashed_pw, role)
+    )
+
+
+def get_user_by_email(email: str):
+    """Fetch a user row by email."""
+    return execute_query(
+        "SELECT * FROM users WHERE email = ?",
+        (email,),
+        fetchone=True
+    )
+
+
+def get_user_by_id(user_id: int):
+    """Fetch a user row by ID."""
+    return execute_query(
+        "SELECT * FROM users WHERE id = ?",
+        (user_id,),
+        fetchone=True
+    )
+
+
+def update_last_login(user_id: int) -> None:
+    """Stamp last_login for the given user."""
+    execute_query(
+        "UPDATE users SET last_login = datetime('now') WHERE id = ?",
+        (user_id,)
+    )
+
+
+def get_all_users():
+    """Return all users (admin use)."""
+    return execute_query(
+        "SELECT id, name, email, role, created_at, last_login FROM users ORDER BY created_at DESC"
+    )
+
+
+def update_user_profile(user_id: int, name: str, avatar: str = None) -> None:
+    """Update user name/avatar."""
+    execute_query(
+        "UPDATE users SET name = ?, avatar = ? WHERE id = ?",
+        (name, avatar, user_id)
+    )
+
+
+def delete_user(user_id: int) -> None:
+    """Delete user and cascade trips."""
+    execute_query("DELETE FROM users WHERE id = ?", (user_id,))
+
+
+def count_users() -> int:
+    """Return total user count."""
+    row = execute_query("SELECT COUNT(*) as cnt FROM users", fetchone=True)
+    return row["cnt"] if row else 0

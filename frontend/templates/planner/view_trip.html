@@ -1,0 +1,512 @@
+{% extends "base.html" %}
+{% block title %}{{ trip.destination }} — Itinerary{% endblock %}
+
+{% block content %}
+<div class="page-wrapper">
+  <div class="container py-4">
+
+    <!-- ── Trip Header ─────────────────────────────────────── -->
+    <div class="itinerary-hero mb-4">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+        <div>
+          <h1 class="itinerary-title">{{ trip.destination }}</h1>
+          <div class="d-flex flex-wrap gap-3 mt-2">
+            <span class="meta-badge"><i class="bi bi-calendar3 me-1"></i>{{ trip.start_date }} → {{ trip.end_date }}</span>
+            <span class="meta-badge"><i class="bi bi-clock me-1"></i>{{ trip.num_days }} days</span>
+            <span class="meta-badge"><i class="bi bi-people me-1"></i>{{ trip.num_travelers }} traveler(s)</span>
+            <span class="meta-badge"><i class="bi bi-wallet2 me-1"></i>${{ "%.0f"|format(trip.budget) }}</span>
+            <span class="meta-badge status-{{ trip.status }}">{{ trip.status|title }}</span>
+          </div>
+        </div>
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn btn-outline-primary btn-sm" onclick="printItinerary()">
+            <i class="bi bi-printer me-1"></i>Print
+          </button>
+          <a href="{{ url_for('planner.download_pdf', trip_id=trip.id) }}" class="btn btn-outline-danger btn-sm">
+            <i class="bi bi-file-pdf me-1"></i>PDF
+          </a>
+          <button class="btn btn-outline-warning btn-sm" data-bs-toggle="modal" data-bs-target="#saveModal">
+            <i class="bi bi-bookmark me-1"></i>Save
+          </button>
+          <form method="POST" action="{{ url_for('planner.delete_trip_route', trip_id=trip.id) }}"
+                onsubmit="return confirm('Delete this trip?')" class="d-inline">
+            <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-1"></i>Delete</button>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Tab Navigation ──────────────────────────────────── -->
+    <ul class="nav nav-pills nav-itinerary mb-4 flex-wrap gap-2" id="itineraryTabs">
+      <li class="nav-item"><a class="nav-link active" data-bs-toggle="pill" href="#tab-itinerary"><i class="bi bi-calendar3 me-1"></i>Itinerary</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-weather"><i class="bi bi-cloud-sun me-1"></i>Weather</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-budget"><i class="bi bi-wallet2 me-1"></i>Budget</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-hotels"><i class="bi bi-building me-1"></i>Hotels</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-packing"><i class="bi bi-bag me-1"></i>Packing</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-map"><i class="bi bi-map me-1"></i>Map</a></li>
+      <li class="nav-item"><a class="nav-link" data-bs-toggle="pill" href="#tab-expenses"><i class="bi bi-receipt me-1"></i>Expenses</a></li>
+    </ul>
+
+    <div class="tab-content">
+
+      <!-- ╔═ TAB 1: ITINERARY ═══════════════════════════════╗ -->
+      <div class="tab-pane fade show active" id="tab-itinerary">
+        {% if itinerary.error %}
+          <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            AI generation note: {{ itinerary.error }}
+            <br><small>This may be a demo result. Configure IBM API keys in <code>.env</code> for live results.</small>
+          </div>
+        {% endif %}
+
+        {% if itinerary.trip_summary %}
+        <div class="trip-summary-card mb-4">
+          <div class="d-flex gap-3">
+            <span class="summary-icon">📋</span>
+            <div>
+              <h5 class="fw-semibold mb-1">Trip Overview</h5>
+              <p class="mb-0">{{ itinerary.trip_summary }}</p>
+              <div class="row g-2 mt-2">
+                {% for k, v in [("best_time_to_visit", itinerary.get("best_time_to_visit", "")),
+                                ("local_language", itinerary.get("local_language", "")),
+                                ("currency", itinerary.get("currency", "")),
+                                ("time_zone", itinerary.get("time_zone", ""))] %}
+                {% if v %}
+                <div class="col-auto">
+                  <span class="info-chip">{{ k.replace('_', ' ')|title }}: {{ v }}</span>
+                </div>
+                {% endif %}
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
+
+        <!-- Day Cards -->
+        {% for day in itinerary.get("days", []) %}
+        <div class="day-card mb-4">
+          <div class="day-header">
+            <div class="day-number">Day {{ day.day }}</div>
+            <div class="day-theme">{{ day.theme }}</div>
+            <div class="day-date text-muted small">{{ day.date }}</div>
+          </div>
+          <div class="day-body">
+            <div class="row g-3">
+              <!-- Morning / Afternoon / Evening -->
+              {% for period in ["morning", "afternoon", "evening"] %}
+              {% set slot = day.get(period, {}) %}
+              {% if slot %}
+              <div class="col-md-4">
+                <div class="time-slot time-{{ period }}">
+                  <div class="time-label">
+                    {% if period == 'morning' %}🌅 Morning
+                    {% elif period == 'afternoon' %}☀️ Afternoon
+                    {% else %}🌆 Evening{% endif %}
+                  </div>
+                  <div class="time-activity fw-semibold mt-1">{{ slot.get("activity", "—") }}</div>
+                  <div class="text-muted small mt-1">
+                    <i class="bi bi-geo-alt me-1"></i>{{ slot.get("place", "") }}
+                  </div>
+                  {% if slot.get("duration") %}
+                  <div class="text-muted small"><i class="bi bi-clock me-1"></i>{{ slot.duration }}</div>
+                  {% endif %}
+                  {% if slot.get("entry_fee") %}
+                  <div class="small mt-1"><span class="badge bg-light text-dark">Entry: {{ slot.entry_fee }}</span></div>
+                  {% endif %}
+                  {% if slot.get("tips") %}
+                  <div class="time-tip mt-2"><i class="bi bi-lightbulb me-1 text-warning"></i>{{ slot.tips }}</div>
+                  {% endif %}
+                </div>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+
+            <!-- Food Recommendations -->
+            {% if day.get("food_recommendations") %}
+            <div class="food-section mt-3">
+              <h6 class="fw-semibold mb-2"><i class="bi bi-fork-knife me-1 text-danger"></i>Food Recommendations</h6>
+              <div class="d-flex flex-wrap gap-2">
+                {% for food in day.food_recommendations %}
+                <div class="food-chip">
+                  <strong>{{ food.meal }}:</strong> {{ food.restaurant }}
+                  <span class="text-muted"> · {{ food.cuisine }} · {{ food.price_range }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Daily Budget + Tips -->
+            <div class="d-flex flex-wrap justify-content-between align-items-center mt-3 gap-3">
+              {% if day.get("daily_budget") %}
+              <div class="daily-budget-chip">
+                <i class="bi bi-wallet me-1"></i>Daily Budget: <strong>${{ day.daily_budget }}</strong>
+              </div>
+              {% endif %}
+              {% if day.get("local_tips") %}
+              <div class="local-tip flex-grow-1 ms-2">
+                <i class="bi bi-info-circle me-1 text-info"></i>{{ day.local_tips }}
+              </div>
+              {% endif %}
+            </div>
+
+            {% if day.get("hidden_gems") %}
+            <div class="hidden-gems mt-2">
+              <span class="fw-semibold small"><i class="bi bi-gem me-1 text-purple"></i>Hidden Gems: </span>
+              {% for gem in day.hidden_gems %}
+                <span class="gem-chip">{{ gem }}</span>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+          <div class="empty-state"><div class="empty-icon">📅</div><p>No day data generated.</p></div>
+        {% endfor %}
+
+        <!-- Safety & Emergency -->
+        {% if itinerary.get("safety_tips") or itinerary.get("emergency_numbers") %}
+        <div class="card-panel mt-4 border-danger-subtle">
+          <h5 class="panel-title text-danger"><i class="bi bi-shield-exclamation me-2"></i>Safety & Emergency</h5>
+          <div class="row g-3 mt-1">
+            <div class="col-md-8">
+              {% for tip in itinerary.get("safety_tips", []) %}
+              <div class="safety-tip"><i class="bi bi-exclamation-triangle-fill me-2 text-warning"></i>{{ tip }}</div>
+              {% endfor %}
+            </div>
+            {% set emg = itinerary.get("emergency_numbers", {}) %}
+            {% if emg %}
+            <div class="col-md-4">
+              <div class="emergency-box">
+                <div class="emg-title">📞 Emergency Numbers</div>
+                <div class="emg-item"><span>Police:</span> <strong>{{ emg.police }}</strong></div>
+                <div class="emg-item"><span>Ambulance:</span> <strong>{{ emg.ambulance }}</strong></div>
+                <div class="emg-item"><span>Tourist Helpline:</span> <strong>{{ emg.tourist_helpline }}</strong></div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ╔═ TAB 2: WEATHER ══════════════════════════════════╗ -->
+      <div class="tab-pane fade" id="tab-weather">
+        {% if weather.current and not weather.current.error %}
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <div class="card-panel weather-hero">
+              <div class="weather-city-name">{{ weather.current.city }}, {{ weather.current.country }}</div>
+              <div class="weather-hero-temp">{{ weather.current.temperature }}°C</div>
+              <div class="weather-hero-desc">{{ weather.current.description }}</div>
+              <div class="weather-grid mt-4">
+                {% for k, icon, val in [
+                  ("Humidity", "💧", weather.current.humidity ~ "%"),
+                  ("Wind", "💨", weather.current.wind_speed ~ " m/s"),
+                  ("Feels Like", "🌡", weather.current.feels_like ~ "°C"),
+                  ("Pressure", "⏱", weather.current.pressure ~ " hPa"),
+                  ("Visibility", "👁", weather.current.visibility ~ " km"),
+                ] %}
+                <div class="weather-detail-item">
+                  <span class="wdi-icon">{{ icon }}</span>
+                  <span class="wdi-label">{{ k }}</span>
+                  <span class="wdi-value">{{ val }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="card-panel">
+              <h5 class="panel-title mb-3">7-Day Forecast</h5>
+              <div class="forecast-grid">
+                {% for day in weather.get("forecast", []) %}
+                <div class="forecast-day">
+                  <div class="fc-date">{{ day.date[5:] }}</div>
+                  <div class="fc-desc">{{ day.description }}</div>
+                  <div class="fc-temps">
+                    <span class="fc-max">{{ day.temp_max|round|int }}°</span>
+                    <span class="fc-min text-muted">{{ day.temp_min|round|int }}°</span>
+                  </div>
+                  <div class="fc-rain text-info small">💧{{ day.rain_prob }}%</div>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% if weather.alerts %}
+            <div class="card-panel mt-3">
+              <h5 class="panel-title mb-3">🚨 Travel Alerts</h5>
+              {% for alert in weather.alerts %}
+              <div class="travel-alert">{{ alert }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+          <div class="empty-state"><div class="empty-icon">🌤</div><p>Weather data unavailable.</p></div>
+        {% endif %}
+      </div>
+
+      <!-- ╔═ TAB 3: BUDGET ═══════════════════════════════════╗ -->
+      <div class="tab-pane fade" id="tab-budget">
+        {% if budget.breakdown %}
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <div class="card-panel">
+              <h5 class="panel-title mb-3">Budget Distribution</h5>
+              <canvas id="budgetPieChart" height="280"></canvas>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="card-panel">
+              <h5 class="panel-title mb-3">Breakdown Details</h5>
+              {% for cat, info in budget.breakdown.items() %}
+              <div class="budget-row">
+                <div class="budget-row-label">{{ cat.replace('_', ' ')|title }}</div>
+                <div class="budget-row-bar">
+                  <div class="budget-bar-fill" style="width: {{ info.percentage }}%"></div>
+                </div>
+                <div class="budget-row-amount">${{ "{:,.0f}".format(info.amount) }}</div>
+                <div class="budget-row-pct text-muted small">{{ "%.1f"|format(info.percentage) }}%</div>
+              </div>
+              {% endfor %}
+              <div class="budget-total-row mt-3">
+                Total: <strong>${{ "{:,.0f}".format(budget.total_budget) }}</strong>
+                &nbsp;|&nbsp; Per day: <strong>${{ "{:,.0f}".format(budget.daily_average) }}</strong>
+                &nbsp;|&nbsp; Status:
+                <span class="badge bg-{{ 'success' if budget.budget_status == 'comfortable' else 'warning' }}">
+                  {{ budget.budget_status|title }}
+                </span>
+              </div>
+            </div>
+            {% if budget.saving_tips %}
+            <div class="card-panel mt-3">
+              <h5 class="panel-title mb-3">💡 Saving Tips</h5>
+              {% for tip in budget.saving_tips %}
+              <div class="saving-tip"><i class="bi bi-piggy-bank me-2 text-success"></i>{{ tip }}</div>
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+        {% else %}
+          <div class="empty-state"><div class="empty-icon">💰</div><p>Budget data not available.</p></div>
+        {% endif %}
+      </div>
+
+      <!-- ╔═ TAB 4: HOTELS ═══════════════════════════════════╗ -->
+      <div class="tab-pane fade" id="tab-hotels">
+        {% for tier, label, badge_color in [
+          ("budget_hotels", "Budget Hotels", "success"),
+          ("mid_range_hotels", "Mid-range Hotels", "primary"),
+          ("luxury_hotels", "Luxury Hotels", "warning")
+        ] %}
+        {% if hotels.get(tier) %}
+        <h5 class="fw-semibold mb-3 mt-4">
+          <span class="badge bg-{{ badge_color }} me-2">{{ label }}</span>
+        </h5>
+        <div class="row g-3">
+          {% for h in hotels[tier] %}
+          <div class="col-md-6 col-lg-4">
+            <div class="hotel-card h-100">
+              <div class="hotel-card-header">
+                <div class="hotel-name">{{ h.name }}</div>
+                <div class="hotel-rating">
+                  {% for i in range(h.rating|int) %}<i class="bi bi-star-fill text-warning small"></i>{% endfor %}
+                  <span class="ms-1 small">{{ h.rating }}</span>
+                </div>
+              </div>
+              <div class="hotel-price">${{ h.price_per_night }}<span class="text-muted">/night</span></div>
+              <div class="hotel-distance text-muted small"><i class="bi bi-geo me-1"></i>{{ h.distance_from_center }}</div>
+              {% if h.amenities %}
+              <div class="hotel-amenities mt-2 d-flex flex-wrap gap-1">
+                {% for a in h.amenities %}
+                <span class="amenity-chip">{{ a }}</span>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% if h.booking_tip %}
+              <div class="hotel-tip mt-2 small text-muted"><i class="bi bi-lightbulb me-1"></i>{{ h.booking_tip }}</div>
+              {% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% endfor %}
+        {% if hotels.get("booking_advice") %}
+        <div class="card-panel mt-4">
+          <h5 class="panel-title"><i class="bi bi-info-circle me-2 text-primary"></i>Booking Advice</h5>
+          <p class="mb-0">{{ hotels.booking_advice }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ╔═ TAB 5: PACKING ══════════════════════════════════╗ -->
+      <div class="tab-pane fade" id="tab-packing">
+        {% set packing = itinerary.get("packing_checklist", {}) %}
+        {% if packing %}
+        <div class="row g-4">
+          {% for category, items in packing.items() %}
+          {% if items %}
+          <div class="col-md-6 col-lg-4">
+            <div class="card-panel h-100">
+              <h5 class="panel-title mb-3">
+                {% if category == 'clothes' %}👔
+                {% elif category == 'electronics' %}📱
+                {% elif category == 'medicines' %}💊
+                {% elif category == 'documents' %}📄
+                {% elif category == 'accessories' %}🎒
+                {% else %}📦{% endif %}
+                {{ category.replace('_', ' ')|title }}
+              </h5>
+              <ul class="packing-list list-unstyled mb-0">
+                {% for item in items %}
+                <li class="packing-item">
+                  <input type="checkbox" class="form-check-input me-2" id="pack_{{ loop.index }}_{{ category }}" />
+                  <label for="pack_{{ loop.index }}_{{ category }}">{{ item }}</label>
+                </li>
+                {% endfor %}
+              </ul>
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        </div>
+        {% else %}
+          <div class="empty-state"><div class="empty-icon">🎒</div><p>Packing list not available.</p></div>
+        {% endif %}
+      </div>
+
+      <!-- ╔═ TAB 6: MAP ══════════════════════════════════════╗ -->
+      <div class="tab-pane fade" id="tab-map">
+        <div class="card-panel">
+          <h5 class="panel-title mb-3"><i class="bi bi-map me-2 text-primary"></i>Interactive Map — {{ trip.destination }}</h5>
+          <div id="tripMap" style="height:500px; border-radius: 12px;"></div>
+          <div class="map-legend mt-3 d-flex flex-wrap gap-3">
+            <span class="legend-item"><i class="bi bi-building text-primary"></i> Hotels</span>
+            <span class="legend-item"><i class="bi bi-fork-knife text-danger"></i> Restaurants</span>
+            <span class="legend-item"><i class="bi bi-geo-alt text-success"></i> Attractions</span>
+            <span class="legend-item"><i class="bi bi-hospital text-danger"></i> Hospital</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ╔═ TAB 7: EXPENSES ═════════════════════════════════╗ -->
+      <div class="tab-pane fade" id="tab-expenses">
+        <div class="row g-4">
+          <div class="col-lg-5">
+            <div class="card-panel">
+              <h5 class="panel-title mb-3">Add Expense</h5>
+              <form method="POST" action="{{ url_for('planner.add_expense_route', trip_id=trip.id) }}">
+                <div class="mb-3">
+                  <label class="form-label">Category</label>
+                  <select name="category" class="form-select">
+                    {% for cat in ["accommodation","food","transport","activities","shopping","miscellaneous"] %}
+                    <option value="{{ cat }}">{{ cat|title }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Amount (USD)</label>
+                  <input type="number" name="amount" class="form-control" min="0" step="0.01" required />
+                </div>
+                <div class="mb-3">
+                  <label class="form-label">Description</label>
+                  <input type="text" name="description" class="form-control" placeholder="e.g. Hotel night 1" />
+                </div>
+                <button type="submit" class="btn btn-ibm w-100">Add Expense</button>
+              </form>
+            </div>
+          </div>
+          <div class="col-lg-7">
+            <div class="card-panel">
+              <h5 class="panel-title mb-3">Expense Log</h5>
+              {% if expenses %}
+              <div class="expense-table">
+                <table class="table table-sm">
+                  <thead><tr><th>Date</th><th>Category</th><th>Description</th><th class="text-end">Amount</th></tr></thead>
+                  <tbody>
+                    {% for e in expenses %}
+                    <tr>
+                      <td class="text-muted small">{{ e.date[:10] }}</td>
+                      <td><span class="badge bg-light text-dark">{{ e.category|title }}</span></td>
+                      <td>{{ e.description or '—' }}</td>
+                      <td class="text-end fw-semibold">${{ "%.2f"|format(e.amount) }}</td>
+                    </tr>
+                    {% endfor %}
+                    <tr class="table-active">
+                      <td colspan="3" class="fw-bold">Total Spent</td>
+                      <td class="text-end fw-bold">${{ "%.2f"|format(expenses|sum(attribute='amount')) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+                <p class="text-muted">No expenses logged yet.</p>
+              {% endif %}
+              {% if expenses %}
+              <canvas id="expenseChart" height="200" class="mt-3"></canvas>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /tab-content -->
+  </div>
+</div>
+
+<!-- Save Modal -->
+<div class="modal fade" id="saveModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title"><i class="bi bi-bookmark me-2"></i>Save Trip</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form method="POST" action="{{ url_for('planner.save_trip_route', trip_id=trip.id) }}">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Personal Notes (optional)</label>
+            <textarea name="notes" class="form-control" rows="3" placeholder="Add notes about this trip..."></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-ibm">Save Trip</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- MapLibre GL -->
+<link href="https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl.css" rel="stylesheet" />
+<script src="https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl.js"></script>
+
+<script>
+const TRIP_DEST = "{{ trip.destination|e }}";
+{% if budget.breakdown %}
+const BUDGET_LABELS = {{ budget.breakdown.keys()|list|tojson }};
+const BUDGET_DATA   = {{ budget.breakdown.values()|map(attribute='amount')|list|tojson }};
+{% else %}
+const BUDGET_LABELS = [];
+const BUDGET_DATA   = [];
+{% endif %}
+
+{% if expenses %}
+const EXP_LABELS = {{ expenses|map(attribute='category')|list|tojson }};
+const EXP_DATA   = {{ expenses|map(attribute='amount')|list|tojson }};
+{% else %}
+const EXP_LABELS = [];
+const EXP_DATA   = [];
+{% endif %}
+</script>
+<script src="{{ url_for('static', filename='js/trip_view.js') }}"></script>
+{% endblock %}

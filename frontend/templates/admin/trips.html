@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Manage Trips — Admin{% endblock %}
+{% block content %}
+<div class="page-wrapper">
+  <div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1 class="page-title mb-0"><i class="bi bi-airplane me-2"></i>All Trips</h1>
+      <a href="{{ url_for('admin.admin_dashboard') }}" class="btn btn-outline-secondary btn-sm">← Admin Home</a>
+    </div>
+    <div class="card-panel">
+      <div class="table-responsive">
+        <table class="table table-hover table-sm">
+          <thead class="table-light">
+            <tr><th>ID</th><th>Destination</th><th>User</th><th>Style</th><th>Days</th><th>Budget</th><th>Status</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            {% for t in trips %}
+            <tr>
+              <td>{{ t.id }}</td>
+              <td><strong>{{ t.destination }}</strong></td>
+              <td class="text-muted">{{ t.user_name }}<br><small>{{ t.user_email }}</small></td>
+              <td><span class="badge bg-light text-dark">{{ t.travel_style|title }}</span></td>
+              <td>{{ t.num_days }}d</td>
+              <td>${{ "%.0f"|format(t.budget) }}</td>
+              <td><span class="badge bg-{{ 'success' if t.status == 'completed' else 'secondary' }}">{{ t.status }}</span></td>
+              <td class="text-muted small">{{ t.created_at[:10] }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
