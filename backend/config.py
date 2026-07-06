@@ -41,10 +41,10 @@ class Config:
     def __init__(self):
         """Read all env vars at instantiation time (after load_dotenv)."""
         self.IBM_API_KEY      = os.environ.get("IBM_API_KEY", "")
-        self.IBM_PROJECT_ID   = os.environ.get("IBM_PROJECT_ID", "")
-        self.IBM_WATSONX_URL  = os.environ.get("IBM_WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
+        self.IBM_PROJECT_ID   = os.environ.get("IBM_PROJECT_ID") or os.environ.get("WATSONX_PROJECT_ID", "")
+        self.IBM_WATSONX_URL  = os.environ.get("IBM_WATSONX_URL") or os.environ.get("WATSONX_URL", "https://us-south.ml.cloud.ibm.com")
         self.GRANITE_MODEL_ID = os.environ.get("GRANITE_MODEL_ID", "ibm/granite-4-h-small")
-        self.WEATHER_API_KEY  = os.environ.get("WEATHER_API_KEY", "")
+        self.WEATHER_API_KEY  = os.environ.get("WEATHER_API_KEY") or os.environ.get("OPENWEATHER_API_KEY", "")
         self.EXCHANGE_API_KEY = os.environ.get("EXCHANGE_API_KEY", "")
 
     # ── Upload ────────────────────────────────────────────────
